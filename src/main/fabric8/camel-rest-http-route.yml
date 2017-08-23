@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Route
+spec:
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: camel-rest-routing
+    weight: 100
+  wildcardPolicy: None
+status: {}

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:camel="http://camel.apache.org/schema/spring"
+    xmlns:cxf="http://camel.apache.org/schema/cxf"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://camel.apache.org/schema/cxf http://camel.apache.org/schema/cxf/camel-cxf.xsd      http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd             http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+    <bean
+        class="org.springframework.boot.context.embedded.ServletRegistrationBean" id="camelServlet">
+        <property name="name" value="CamelServlet"/>
+        <property name="loadOnStartup" value="1"/>
+        <property name="servlet">
+            <bean
+                class="org.apache.camel.component.servlet.CamelHttpTransportServlet" id="camelServlet"/>
+        </property>
+        <property name="urlMappings" value="/*"/>
+    </bean>
+    <cxf:cxfEndpoint
+        address="http://fis-camel-webservice.fuse.svc.cluster.local:8080/training/WebService"
+        endpointName="CustomerServicePort" id="wsCustomer" serviceClass="com.redhat.gpe.training.CustomerService"/>
+    <!-- You could also define a traditional camel context here -->
+    <camelContext id="camelContext-9c1b61aa-79ad-4e73-9506-271413368fb5" xmlns="http://camel.apache.org/schema/spring">
+        <restConfiguration apiContextPath="/api-docs" bindingMode="auto"
+            component="servlet" enableCORS="true">
+            <apiProperty key="api.title" value="Customer Service API"/>
+            <apiProperty key="api.version" value="1.0.0"/>
+            <apiProperty key="api.description" value="Create, Delete and Retrieve Customers"/>
+        </restConfiguration>
+        <rest path="">
+            <post consumes="application/json"
+                outType="com.redhat.gpe.training.Customer"
+                type="com.redhat.gpe.training.Customer" uri="customer">
+                <param dataType="string" name="user_key" required="true" type="query"/>
+                <to uri="direct:saveCustomer"/>
+            </post>
+            <get bindingMode="json"
+                outType="com.redhat.gpe.training.GetCustomerByNameResponse"
+                produces="application/json" uri="customer/{name}">
+                <param dataType="string" name="user_key" required="true" type="query"/>
+                <to uri="direct:getCustomerByName"/>
+            </get>
+            <get bindingMode="json"
+                outType="com.redhat.gpe.training.CustomerType"
+                produces="application/json" uri="allcustomers">
+                <param dataType="string" name="user_key" required="true" type="query"/>
+                <to uri="direct:getAllCustomers"/>
+            </get>
+        </rest>
+        <route id="createCustomer">
+            <from id="_from1" uri="direct:saveCustomer"/>
+            <setBody id="_setBody1">
+                <simple>${body.getCustomer()}</simple>
+            </setBody>
+            <setHeader headerName="soapMethod" id="_setHeader1">
+                <constant>saveCustomer</constant>
+            </setHeader>
+            <to id="_to1" uri="direct:soap"/>
+        </route>
+        <route id="getCustomer">
+            <from id="_from3" uri="direct:getCustomerByName"/>
+            <setBody id="_setBody3">
+                <simple>${header.name}</simple>
+            </setBody>
+            <setHeader headerName="soapMethod" id="_setHeader3">
+                <constant>getCustomerByName</constant>
+            </setHeader>
+            <to id="_to3" uri="direct:soap"/>
+        </route>
+        <route id="getAllCustomers">
+            <from id="_from4" uri="direct:getAllCustomers"/>
+            <setBody id="_setBody4">
+                <mvel>new Object[0]</mvel>
+            </setBody>
+            <setHeader headerName="soapMethod" id="_setHeader4">
+                <constant>getAllCustomers</constant>
+            </setHeader>
+            <to id="_to4" uri="direct:soap"/>
+        </route>
+        <route id="soapRoute">
+            <from id="_from5" uri="direct:soap"/>
+            <camel:toD id="tod" uri="cxf:bean:wsCustomer?defaultOperationName=${header.soapMethod}&amp;exchangePattern=InOut"/>
+            <setBody id="_setBodySoap">
+                <simple>${body[0]}</simple>
+            </setBody>
+            <setHeader headerName="Content-Type" id="_setHeaderContextType">
+                <constant>application/json</constant>
+            </setHeader>
+        </route>
+    </camelContext>
+</beans>
